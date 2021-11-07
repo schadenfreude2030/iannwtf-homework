@@ -5,20 +5,14 @@ import functions
 class Perceptron:
 
     def __init__(self, input_units):
-        self.weights = np.random.randn(input_units)
-        self.bias = np.random.randn()
-        self.alpha = 1  # learning rate
-        self.latest_weighted_sum = None
-        self.latest_activation = None
-        self.latest_inputs = None
+        self.weights = np.random.normal(size=input_units + 1)
+        self.drive = None
 
     def forward_step(self, inputs):
-        self.latest_inputs = inputs
-        weighted_sum = np.dot(inputs, self.weights) + self.bias
-        self.latest_weighted_sum = weighted_sum  # weighted sum: z(L)
-        self.latest_activation = functions.sigmoid(weighted_sum)  # activation: a(L)
-        return self.latest_activation
+        inputs = np.append(inputs, 1)  # bias
+        self.drive = self.weights @ inputs
+        return functions.sigmoid(self.drive)
 
-    def update(self, changes_weights, changes_bias):
-        self.weights = self.weights - changes_weights
-        self.bias = self.bias - changes_bias
+    def update(self, activations, delta, epsilon):
+        activations = np.append(activations, 1)  # bias
+        self.weights += epsilon * delta * activations

@@ -9,37 +9,34 @@ class MLP:
     def __init__(self):
         self.hidden_layer = [perceptron.Perceptron(2) for i in range(self.HIDDEN_LAYER_SIZE)]
         self.output_perceptron = perceptron.Perceptron(self.HIDDEN_LAYER_SIZE)
+        self.epsilon = 1
+        self.last_inputs = None
         self.hidden_layer_activations = None
         self.output_activation = None
 
     def forward_step(self, inputs):
-        self.hidden_layer_activations = [layer.forward_step(inputs) for layer in self.hidden_layer]
+        # save all activations for backprop step
+        self.last_inputs = inputs
+        self.hidden_layer_activations = np.array([layer.forward_step(inputs) for layer in self.hidden_layer])
         self.output_activation = self.output_perceptron.forward_step(self.hidden_layer_activations)
         return self.output_activation
 
     def backprop_step(self, expected_output):
+        # calc loss for return
         loss = (self.output_activation - expected_output) ** 2
-        delta_z_over_w = 2 * (self.output_activation - expected_output)
-        delta_a_over_z = functions.sigmoid_prime(self.output_perceptron.latest_weighted_sum)
-        delta_C_over_a = np.array(self.hidden_layer_activations)
-        changes_weights = (delta_z_over_w * delta_a_over_z * delta_C_over_a)
-        changes_bias = (delta_z_over_w * delta_a_over_z)
-        self.output_perceptron.update(
-            changes_weights,
-            changes_bias
-        )
 
-        hidden_weights_changes = [
-            sum([
-                self.output_perceptron.weights[i] * ptron.latest_activation for i in range(self.HIDDEN_LAYER_SIZE)
-            ]) * functions.sigmoid_prime(ptron.latest_weighted_sum) * np.array(ptron.latest_inputs) for ptron in self.hidden_layer
-        ]
-        hidden_bias_changes = [
-            functions.sigmoid_prime(ptron.latest_weighted_sum) for ptron in self.hidden_layer
-        ]
+        # delta for output perceptron
+        output_activation = np.array([self.output_activation])
+        delta = (expected_output - output_activation) * (output_activation * (1 - output_activation))
+        self.output_perceptron.update(self.hidden_layer_activations, delta, self.epsilon)
+
+        # delta for hidden layer
+        hidden_activation = self.hidden_layer_activations
+        weights_matrix = np.array([self.output_perceptron.weights[:-1]])  # without bias
+        sigmoid_prime = hidden_activation * (np.ones_like(hidden_activation) - hidden_activation)
+        delta = (delta.T @ weights_matrix) * sigmoid_prime
+
         for i in range(self.HIDDEN_LAYER_SIZE):
-            self.hidden_layer[i].update(
-                hidden_weights_changes[i],
-                hidden_bias_changes[i]
-            )
+            self.hidden_layer[i].update(self.last_inputs, delta[i], self.epsilon)
+
         return loss
